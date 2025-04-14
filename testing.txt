@@ -1,1 +1,55 @@
-hello
+START:
+sudo systemctl start kafka
+
+/opt/spark/sbin/start-all.sh
+
+CREATE TOPIC:
+/usr/local/kafka/bin/kafka-topics.sh --create --topic reddit-posts --bootstrap-server localhost:9092 --partitions 1 --replication-factor 1
+
+
+POSTGRES:
+ravani@sravani-VirtualBox:~$ psql -U root -W -d reddit_stream_db -h localhost
+Password: 
+psql (14.17 (Ubuntu 14.17-0ubuntu0.22.04.1))
+SSL connection (protocol: TLSv1.3, cipher: TLS_AES_256_GCM_SHA384, bits: 256, compression: off)
+Type "help" for help.
+
+reddit_stream_db=> DO
+$$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN (SELECT tablename FROM pg_tables WHERE schemaname = 'public') LOOP
+        EXECUTE 'DROP TABLE IF EXISTS ' || quote_ident(r.tablename) || ' CASCADE';
+    END LOOP;
+END;
+$$;
+DO
+reddit_stream_db=> CREATE TABLE sentiment_results (
+    id TEXT PRIMARY KEY,
+    title TEXT,
+    selftext TEXT,
+    score INTEGER,
+    created_utc TIMESTAMP,
+    num_comments INTEGER,
+    sentiment TEXT
+);
+CREATE TABLE
+
+
+RUNNING:
+python3 ingestion/reddit_producer.py
+
+CHECKING:
+python3 ingestion/cons.py
+
+SPARK:
+ /home/sravani/.local/bin/spark-submit     --jars /home/sravani/jars/postgresql-42.3.1.jar     --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.1.1     spark_streaming/spark_sentiment_consumer.py
+
+ fix jar file location in command and in code to local one
+
+
+ CHECKING POSTGRES:
+ reddit_stream_db=> \x
+Expanded display is on.
+reddit_stream_db=> SELECT * FROM sentiment_results ORDER BY created_utc DESC LIMIT 10;

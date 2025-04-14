@@ -22,31 +22,35 @@ try:
     print("Connected to Reddit and accessing the subreddit.")
 except Exception as e:
     print(f"Error connecting to Reddit: {e}")
-    exit(1)  # Exit the script if Reddit connection fails
+    exit(1)
 
-# Fetch existing posts (latest 100 posts)
-for post in subreddit.new(limit=5):  # Change 100 to any number based on how many posts you want to fetch
-    data = {
-        'id': post.id,
-        'title': post.title,
-        'score': post.score,
-        'created_utc': post.created_utc,
-        'num_comments': post.num_comments,
-        'selftext': post.selftext,
-    }
-    print(f"Produced (existing post): {data}")  # Debug line to check
-    producer.send('reddit-posts', value=data)
+# Function to fetch existing posts
+def fetch_existing_posts():
+    # You can adjust the limit or use the 'new()' function for most recent posts, 'hot()' for hot posts, etc.
+    return subreddit.new(limit=None)  # Get all existing posts (it will keep fetching in chunks)
 
-# Streaming new posts continuously
-for post in subreddit.stream.submissions(skip_existing=True):  # Now, we can safely use skip_existing=True for continuous stream
-    data = {
-        'id': post.id,
-        'title': post.title,
-        'score': post.score,
-        'created_utc': post.created_utc,
-        'num_comments': post.num_comments,
-        'selftext': post.selftext,
-    }
-    print(f"Produced (new post): {data}")  # Debug line to check
-    producer.send('reddit-posts', value=data)
-    time.sleep(1)  # Add a delay to avoid making too many requests to Reddit too quickly
+# Continuously fetch and send existing posts to Kafka
+try:
+    # Infinite loop to keep fetching posts
+    for post in fetch_existing_posts():
+        data = {
+            'id': post.id,
+            'title': post.title,
+            'score': post.score,
+            'created_utc': post.created_utc,
+            'num_comments': post.num_comments,
+            'selftext': post.selftext if post.selftext else ""  # Check if selftext exists, else use empty string
+        }
+        print(f"Produced (existing post): {data}")
+        producer.send('reddit-posts', value=data)
+        
+        # Sleep for a moment to control the rate of fetching (adjust as necessary)
+        time.sleep(1)
+
+except KeyboardInterrupt:
+    print("Stream interrupted by user.")
+finally:
+    # Close the producer gracefully
+    producer.flush()
+    producer.close()
+    print("Producer closed.")
