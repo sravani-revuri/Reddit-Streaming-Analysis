@@ -18,7 +18,7 @@ producer = KafkaProducer(
 
 # Test if Reddit is accessible
 try:
-    subreddit = reddit.subreddit('PESU')
+    subreddit = reddit.subreddit('Naruto')
     print("Connected to Reddit and accessing the subreddit.")
 except Exception as e:
     print(f"Error connecting to Reddit: {e}")
@@ -42,7 +42,7 @@ try:
             'selftext': post.selftext if post.selftext else ""  # Check if selftext exists, else use empty string
         }
         print(f"Produced (existing post): {data}")
-        producer.send('reddit-posts', value=data)
+        producer.send('reddit-raw-posts', value=data)
         
         # Sleep for a moment to control the rate of fetching (adjust as necessary)
         time.sleep(1)

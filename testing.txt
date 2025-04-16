@@ -53,3 +53,9 @@ SPARK:
  reddit_stream_db=> \x
 Expanded display is on.
 reddit_stream_db=> SELECT * FROM sentiment_results ORDER BY created_utc DESC LIMIT 10;
+
+
+ /home/sravani/.local/bin/spark-submit --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.2.1   /home/sravani/dbt/DBT-PROJECT/spark_streaming/keyword_filter.py
+
+
+ /home/sravani/.local/bin/spark-submit   --jars /home/sravani/jars/postgresql-42.3.1.jar   --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0   /home/sravani/dbt/DBT-PROJECT/spark_streaming/spark_sentiment_consumer.py

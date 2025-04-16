@@ -30,7 +30,6 @@ sentiment_udf = udf(get_sentiment, StringType())
 # Initialize Spark session
 spark = SparkSession.builder \
     .appName("RedditSentimentAnalysis") \
-    .config("spark.jars", "/home/sravani/jars/postgresql-42.3.1.jar") \
     .getOrCreate()
 
 spark.sparkContext.setLogLevel("WARN")
@@ -48,7 +47,7 @@ schema = StructType([
 # Read from Kafka
 df = spark.readStream.format("kafka") \
     .option("kafka.bootstrap.servers", "localhost:9092") \
-    .option("subscribe", "reddit-posts") \
+    .option("subscribe", "reddit-keyword-filtered") \
     .option("startingOffsets", "latest") \
     .load()
 
