@@ -35,7 +35,7 @@ json_df = df.selectExpr("CAST(value AS STRING)") \
 
 # Function to filter posts by the keyword 'Naruto' in the title
 def filter_by_naruto(title):
-    if title and "minato" in title.lower():  # Check if 'naruto' is in the title (case insensitive)
+    if title and "sasuke" in title.lower():  # Check if 'naruto' is in the title (case insensitive)
         return True
     return False
 
