@@ -83,3 +83,94 @@ reddit_stream_db=> SELECT * FROM sentiment_results ORDER BY created_utc DESC LIM
     --jars /opt/jars/postgresql-42.3.1.jar \
     --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.1.1 \
     /root/Reddit-Stream/DBT-PROJECT/batch_processing/batch_title_sentiment.py
+from pyspark.sql import SparkSession
+from pyspark.sql import functions as F
+from pyspark.sql.functions import explode, split, col, lower, window
+from pyspark.sql import DataFrame
+import logging
+
+# Initialize Spark Session and set log level
+spark = SparkSession.builder \
+    .appName("RedditWordCount") \
+    .getOrCreate()
+
+# Set Spark log level to WARN
+spark.sparkContext.setLogLevel("WARN")
+
+# Setup Kafka Consumer
+kafka_bootstrap_servers = 'localhost:9092'
+kafka_topic = 'hot-topic'
+
+# Load Kafka Stream as a DataFrame
+kafka_df = spark.readStream \
+    .format("kafka") \
+    .option("kafka.bootstrap.servers", kafka_bootstrap_servers) \
+    .option("subscribe", kafka_topic) \
+    .load()
+
+# Parse Kafka JSON data
+parsed_df = kafka_df.selectExpr("CAST(value AS STRING)", "timestamp as kafka_timestamp") \
+    .select(F.from_json("value", "STRUCT<id: STRING, title: STRING, score: INT, created_utc: DOUBLE, num_comments: INT, selftext: STRING>").alias("data"),
+            "kafka_timestamp")
+
+# Extract title column
+titles_df = parsed_df.select("data.title", "kafka_timestamp")
+
+# Tokenize titles into words
+words_df = titles_df.select(explode(split(lower(col("title")), r"\W+")).alias("word"), "kafka_timestamp")
+
+# Remove empty words (if any)
+words_df = words_df.filter(words_df["word"] != "")
+
+# Perform windowed aggregation using the Kafka timestamp
+windowed_df = words_df \
+    .groupBy(window(col("kafka_timestamp"), "1 minute"), "word") \
+    .count()
+
+# Extract start and end from the window column and rename them
+windowed_df = windowed_df \
+    .withColumn("window_start", col("window.start")) \
+    .withColumn("window_end", col("window.end")) \
+    .drop("window")  # Drop the original window column
+
+# Show schema to debug
+windowed_df.printSchema()
+
+# Write to PostgreSQL function using JDBC
+def write_to_postgres(df: DataFrame, epoch_id: int):
+    # Print the batch data to debug
+    df.show(truncate=False)  # Print out the data
+    
+    # Writing to PostgreSQL using JDBC
+    df.write.format("jdbc") \
+        .option("url", "jdbc:postgresql://localhost:5432/reddit_stream_db") \
+        .option("dbtable", "trending_words") \
+        .option("user", "root") \
+        .option("password", "root") \
+        .option("driver", "org.postgresql.Driver") \
+        .mode("append") \
+        .save()
+
+# Write the word count to PostgreSQL
+query = windowed_df.writeStream \
+    .foreachBatch(write_to_postgres) \
+    .outputMode("complete") \
+    .start()
+
+query.awaitTermination()
+
+# Stop the Spark session gracefully
+spark.stop()
+
+
+ /home/sravani/.local/bin/spark-submit   --jars /home/sravani/jars/postgresql-42.3.1.jar   --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.2.1   /home/sravani/dbt/DBT-PROJECT/spark_streaming/hot_topic_aggregator.py
+
+
+ CREATE TABLE trending_words_batch (
+    batch_id INT,
+    word VARCHAR(255),
+    count INT,
+    window_start TIMESTAMP,
+    window_end TIMESTAMP,
+    PRIMARY KEY (batch_id, word)
+);
