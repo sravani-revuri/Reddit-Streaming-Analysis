@@ -3,6 +3,7 @@ from pyspark.sql.functions import from_json, col, udf, when
 from pyspark.sql.types import *
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 from pyspark.sql.functions import from_unixtime
+from pyspark.sql.functions import to_json, struct
 
 # Broadcast the analyzer to avoid serialization issues
 analyzer = SentimentIntensityAnalyzer()
@@ -69,8 +70,8 @@ with_sentiment = json_df.withColumn("sentiment", sentiment_udf(col("title")))
 with_sentiment = with_sentiment.withColumn("created_utc", from_unixtime(col("created_utc")).cast(TimestampType()))
 
 
-# Write batch to PostgreSQL
 def write_to_postgres(df, epoch_id):
+    # Write to PostgreSQL
     df.write.format("jdbc") \
         .option("url", "jdbc:postgresql://localhost:5432/reddit_stream_db") \
         .option("dbtable", "sentiment_results") \
@@ -78,6 +79,26 @@ def write_to_postgres(df, epoch_id):
         .option("password", "root") \
         .option("driver", "org.postgresql.Driver") \
         .mode("append") \
+        .save()
+
+    # Select fields you want to send to Kafka (convert to JSON string)
+    kafka_df = df.select(
+        to_json(struct(
+            col("id"),
+            col("title"),
+            col("selftext"),
+            col("score"),
+            col("created_utc"),
+            col("num_comments"),
+            col("sentiment")
+        )).alias("value")  # Kafka requires a "value" column
+    )
+
+    # Send to Kafka topic "sentiment_analyse"
+    kafka_df.write \
+        .format("kafka") \
+        .option("kafka.bootstrap.servers", "localhost:9092") \
+        .option("topic", "sentiment_analyse") \
         .save()
 
 # Start the stream
