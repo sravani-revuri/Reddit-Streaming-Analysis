@@ -51,4 +51,4 @@ final_df.write \
     .mode("append") \
     .save()
 
-print("✅ Aggregated sentiment written to 'sentiment_aggregated_batch' based on ingestion_time")
+print("Aggregated sentiment written to 'sentiment_aggregated_batch' based on ingestion_time")
