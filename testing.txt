@@ -8,7 +8,7 @@ CREATE TOPIC:
 /opt/kafka/bin/kafka-topics.sh --create --topic reddit-keyword-filtered --bootstrap-server localhost:9092 --partitions 1 --replication-factor 1
 
 POSTGRES:
-ravani@sravani-VirtualBox:~$ psql -U root -W -d reddit_stream_db -h localhost
+psql -U root -W -d reddit_stream_db -h localhost
 Password: 
 psql (14.17 (Ubuntu 14.17-0ubuntu0.22.04.1))
 SSL connection (protocol: TLSv1.3, cipher: TLS_AES_256_GCM_SHA384, bits: 256, compression: off)
@@ -68,7 +68,7 @@ SPARK:
 
 
  CHECKING POSTGRES:
- reddit_stream_db=> \x
+reddit_stream_db=> \x
 Expanded display is on.
 reddit_stream_db=> SELECT * FROM sentiment_results ORDER BY created_utc DESC LIMIT 10;
 
@@ -78,89 +78,12 @@ reddit_stream_db=> SELECT * FROM sentiment_results ORDER BY created_utc DESC LIM
 
  /home/sravani/.local/bin/spark-submit   --jars /home/sravani/jars/postgresql-42.3.1.jar   --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0   /home/sravani/dbt/DBT-PROJECT/spark_streaming/spark_sentiment_consumer.py
 
+if spark/kafka in opt folder use this command:
 
 /opt/spark/bin/spark-submit \
     --jars /opt/jars/postgresql-42.3.1.jar \
     --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.1.1 \
     /root/Reddit-Stream/DBT-PROJECT/batch_processing/batch_title_sentiment.py
-from pyspark.sql import SparkSession
-from pyspark.sql import functions as F
-from pyspark.sql.functions import explode, split, col, lower, window
-from pyspark.sql import DataFrame
-import logging
-
-# Initialize Spark Session and set log level
-spark = SparkSession.builder \
-    .appName("RedditWordCount") \
-    .getOrCreate()
-
-# Set Spark log level to WARN
-spark.sparkContext.setLogLevel("WARN")
-
-# Setup Kafka Consumer
-kafka_bootstrap_servers = 'localhost:9092'
-kafka_topic = 'hot-topic'
-
-# Load Kafka Stream as a DataFrame
-kafka_df = spark.readStream \
-    .format("kafka") \
-    .option("kafka.bootstrap.servers", kafka_bootstrap_servers) \
-    .option("subscribe", kafka_topic) \
-    .load()
-
-# Parse Kafka JSON data
-parsed_df = kafka_df.selectExpr("CAST(value AS STRING)", "timestamp as kafka_timestamp") \
-    .select(F.from_json("value", "STRUCT<id: STRING, title: STRING, score: INT, created_utc: DOUBLE, num_comments: INT, selftext: STRING>").alias("data"),
-            "kafka_timestamp")
-
-# Extract title column
-titles_df = parsed_df.select("data.title", "kafka_timestamp")
-
-# Tokenize titles into words
-words_df = titles_df.select(explode(split(lower(col("title")), r"\W+")).alias("word"), "kafka_timestamp")
-
-# Remove empty words (if any)
-words_df = words_df.filter(words_df["word"] != "")
-
-# Perform windowed aggregation using the Kafka timestamp
-windowed_df = words_df \
-    .groupBy(window(col("kafka_timestamp"), "1 minute"), "word") \
-    .count()
-
-# Extract start and end from the window column and rename them
-windowed_df = windowed_df \
-    .withColumn("window_start", col("window.start")) \
-    .withColumn("window_end", col("window.end")) \
-    .drop("window")  # Drop the original window column
-
-# Show schema to debug
-windowed_df.printSchema()
-
-# Write to PostgreSQL function using JDBC
-def write_to_postgres(df: DataFrame, epoch_id: int):
-    # Print the batch data to debug
-    df.show(truncate=False)  # Print out the data
-    
-    # Writing to PostgreSQL using JDBC
-    df.write.format("jdbc") \
-        .option("url", "jdbc:postgresql://localhost:5432/reddit_stream_db") \
-        .option("dbtable", "trending_words") \
-        .option("user", "root") \
-        .option("password", "root") \
-        .option("driver", "org.postgresql.Driver") \
-        .mode("append") \
-        .save()
-
-# Write the word count to PostgreSQL
-query = windowed_df.writeStream \
-    .foreachBatch(write_to_postgres) \
-    .outputMode("complete") \
-    .start()
-
-query.awaitTermination()
-
-# Stop the Spark session gracefully
-spark.stop()
 
 
  /home/sravani/.local/bin/spark-submit   --jars /home/sravani/jars/postgresql-42.3.1.jar   --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.2.1   /home/sravani/dbt/DBT-PROJECT/spark_streaming/hot_topic_aggregator.py
@@ -193,12 +116,11 @@ reddit_stream_db=> CREATE TABLE sentiment_aggregated (
 );
 
 
-
 ALTER TABLE sentiment_results
 ADD COLUMN ingestion_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
 
-
  /home/sravani/.local/bin/spark-submit   --jars /home/sravani/jars/postgresql-42.3.1.jar   --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0   /home/sravani/dbt/DBT-PROJECT/spark_streaming/sentiment_aggregator.py
+
 TRUNCATE TABLE public.reddit_keyword_filtered RESTART IDENTITY CASCADE;
 TRUNCATE TABLE public.sentiment_aggregated RESTART IDENTITY CASCADE;
 TRUNCATE TABLE public.sentiment_aggregated_batch RESTART IDENTITY CASCADE;
