@@ -19,16 +19,16 @@ sentiment_df = spark.read \
     .option("driver", "org.postgresql.Driver") \
     .load()
 
-# Ensure the created_utc column is in the correct timestamp type
-sentiment_df = sentiment_df.withColumn("created_utc", col("created_utc").cast(TimestampType()))
+# Ensure the ingestion_time column is in the correct timestamp type
+sentiment_df = sentiment_df.withColumn("ingestion_time", col("ingestion_time").cast(TimestampType()))
 
-# Perform windowed aggregation over 3-minute windows
+# Perform windowed aggregation over 1-minute windows using ingestion_time
 aggregated_df = sentiment_df.groupBy(
-    window(col("created_utc"), "1 day")  # Using 3-minute window for aggregation
+    window(col("ingestion_time"), "1 minute")
 ).agg(
-    _sum(when(col("sentiment") == "positive", 1).otherwise(0)).alias("positive_count"),  # Count positive sentiment
-    _sum(when(col("sentiment") == "negative", 1).otherwise(0)).alias("negative_count"),  # Count negative sentiment
-    _sum(when(col("sentiment") == "neutral", 1).otherwise(0)).alias("neutral_count")  # Count neutral sentiment
+    _sum(when(col("sentiment") == "positive", 1).otherwise(0)).alias("positive_count"),
+    _sum(when(col("sentiment") == "negative", 1).otherwise(0)).alias("negative_count"),
+    _sum(when(col("sentiment") == "neutral", 1).otherwise(0)).alias("neutral_count")
 )
 
 # Select the window start and end times along with sentiment counts
@@ -51,4 +51,4 @@ final_df.write \
     .mode("append") \
     .save()
 
-print("✅ Aggregated sentiment written to 'sentiment_aggregated_batch'")
+print("✅ Aggregated sentiment written to 'sentiment_aggregated_batch' based on ingestion_time")
