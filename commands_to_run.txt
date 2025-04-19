@@ -1,0 +1,160 @@
+#!/bin/bash
+
+############################################
+# REDDIT KAFKA-SPARK-POSTGRES PIPELINE SETUP
+############################################
+
+# Start Kafka
+sudo systemctl start kafka
+
+# Start Spark (Master and Workers)
+/opt/spark/sbin/start-all.sh
+
+############################################
+# CREATE KAFKA TOPICS
+############################################
+
+/usr/local/kafka/bin/kafka-topics.sh --create \
+  --topic reddit-raw-posts \
+  --bootstrap-server localhost:9092 \
+  --partitions 1 \
+  --replication-factor 1
+
+/opt/kafka/bin/kafka-topics.sh --create \
+  --topic reddit-keyword-filtered \
+  --bootstrap-server localhost:9092 \
+  --partitions 1 \
+  --replication-factor 1
+
+############################################
+# POSTGRES DATABASE AND TABLE SETUP
+############################################
+
+psql -U root -W -d reddit_stream_db -h localhost <<EOF
+
+-- Drop all existing tables in public schema
+DO \$\$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN (SELECT tablename FROM pg_tables WHERE schemaname = 'public') LOOP
+        EXECUTE 'DROP TABLE IF EXISTS ' || quote_ident(r.tablename) || ' CASCADE';
+    END LOOP;
+END;
+\$\$;
+
+-- Table: Sentiment analysis results (with full post)
+CREATE TABLE sentiment_results (
+    id TEXT PRIMARY KEY,
+    title TEXT,
+    selftext TEXT,
+    score INTEGER,
+    created_utc TIMESTAMP,
+    num_comments INTEGER,
+    sentiment TEXT
+);
+
+-- Table: Filtered posts without sentiment
+CREATE TABLE reddit_keyword_filtered (
+    id TEXT PRIMARY KEY,
+    title TEXT,
+    selftext TEXT,
+    score INTEGER,
+    created_utc TIMESTAMP,
+    num_comments INTEGER
+);
+
+-- Table: Title-only sentiment (optional use-case)
+CREATE TABLE batch_title_sentiment (
+    id TEXT PRIMARY KEY,
+    title TEXT,
+    title_sentiment TEXT
+);
+
+-- Table: Trending words (batch window)
+CREATE TABLE trending_words_batch (
+    batch_id INT,
+    word VARCHAR(255),
+    count INT,
+    window_start TIMESTAMP,
+    window_end TIMESTAMP,
+    PRIMARY KEY (batch_id, word)
+);
+
+-- Table: Sentiment aggregation (batch)
+CREATE TABLE sentiment_aggregated_batch (
+    window_start TIMESTAMP,
+    window_end TIMESTAMP,
+    positive_count INTEGER,
+    negative_count INTEGER,
+    neutral_count INTEGER
+);
+
+-- Table: Sentiment aggregation (streaming)
+CREATE TABLE sentiment_aggregated (
+    window_start TIMESTAMP,
+    window_end TIMESTAMP,
+    positive_count INTEGER,
+    negative_count INTEGER,
+    neutral_count INTEGER
+);
+
+-- Add ingestion timestamp to sentiment_results
+ALTER TABLE sentiment_results
+ADD COLUMN ingestion_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+
+EOF
+
+############################################
+# START REDDIT DATA INGESTION PRODUCER
+############################################
+
+python3 ingestion/reddit_producer.py &
+
+############################################
+# CHECK BASIC CONSUMER
+############################################
+
+python3 ingestion/cons.py &
+
+############################################
+# RUN SPARK STREAMING/BATCH JOBS
+############################################
+
+# Keyword Filter
+/home/sravani/.local/bin/spark-submit \
+  --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.2.1 \
+  /home/sravani/dbt/DBT-PROJECT/spark_streaming/keyword_filter.py
+
+# Sentiment Analysis (Streaming)
+/home/sravani/.local/bin/spark-submit \
+  --jars /home/sravani/jars/postgresql-42.3.1.jar \
+  --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0 \
+  /home/sravani/dbt/DBT-PROJECT/spark_streaming/spark_sentiment_consumer.py
+
+# Batch Title Sentiment (if using /opt/spark)
+/opt/spark/bin/spark-submit \
+  --jars /opt/jars/postgresql-42.3.1.jar \
+  --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.1.1 \
+  /root/Reddit-Stream/DBT-PROJECT/batch_processing/batch_title_sentiment.py
+
+# Hot Topic Aggregator
+/home/sravani/.local/bin/spark-submit \
+  --jars /home/sravani/jars/postgresql-42.3.1.jar \
+  --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.2.1 \
+  /home/sravani/dbt/DBT-PROJECT/spark_streaming/hot_topic_aggregator.py
+
+# Sentiment Aggregator
+/home/sravani/.local/bin/spark-submit \
+  --jars /home/sravani/jars/postgresql-42.3.1.jar \
+  --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0 \
+  /home/sravani/dbt/DBT-PROJECT/spark_streaming/sentiment_aggregator.py
+
+############################################
+# CHECKING POSTGRES OUTPUT
+############################################
+
+psql -U root -d reddit_stream_db -h localhost <<EOF
+\x
+SELECT * FROM sentiment_results ORDER BY created_utc DESC LIMIT 10;
+EOF
