@@ -1,0 +1,13 @@
+zookeeper-server-start.sh $KAFKA_HOME/config/zookeeper.properties
+
+kafka-server-start.sh $KAFKA_HOME/config/server.properties
+
+cd /mnt/c/Users/rvsra/OneDrive/Desktop/year\ 3/sem\ 6/dbt/DBT-PROJECT
+
+python3 ingestion/reddit_producer.py
+
+ /opt/spark/bin/spark-submit --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.2.1   spark_streaming/keyword_filter.py
+
+ /opt/spark/bin/spark-submit   --jars /home/sravani/libs/postgresql-42.2.5.jar   --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0   spark_streaming/spark_sentiment_consumer.py
+
+ /opt/spark/bin/spark-submit  --jars /home/sravani/libs/postgresql-42.2.5.jar   --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0   spark_streaming/sentiment_aggregator.py
