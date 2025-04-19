@@ -199,3 +199,8 @@ ADD COLUMN ingestion_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
 
 
  /home/sravani/.local/bin/spark-submit   --jars /home/sravani/jars/postgresql-42.3.1.jar   --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0   /home/sravani/dbt/DBT-PROJECT/spark_streaming/sentiment_aggregator.py
+TRUNCATE TABLE public.reddit_keyword_filtered RESTART IDENTITY CASCADE;
+TRUNCATE TABLE public.sentiment_aggregated RESTART IDENTITY CASCADE;
+TRUNCATE TABLE public.sentiment_aggregated_batch RESTART IDENTITY CASCADE;
+TRUNCATE TABLE public.sentiment_results RESTART IDENTITY CASCADE;
+TRUNCATE TABLE public.trending_words_batch RESTART IDENTITY CASCADE;
