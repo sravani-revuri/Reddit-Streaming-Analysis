@@ -1,6 +1,10 @@
+import time
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, when, window, sum as _sum
 from pyspark.sql.types import TimestampType
+
+# Start timing
+start_time = time.time()
 
 # Initialize Spark session
 spark = SparkSession.builder \
@@ -51,4 +55,8 @@ final_df.write \
     .mode("append") \
     .save()
 
-print("Aggregated sentiment written to 'sentiment_aggregated_batch' based on ingestion_time")
+# End timing and print duration
+end_time = time.time()
+elapsed_time = end_time - start_time
+print(f" Aggregated sentiment written to 'sentiment_aggregated_batch'")
+print(f" Time taken: {elapsed_time:.2f} seconds")

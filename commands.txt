@@ -11,3 +11,5 @@ python3 ingestion/reddit_producer.py
  /opt/spark/bin/spark-submit   --jars /home/sravani/libs/postgresql-42.2.5.jar   --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0   spark_streaming/spark_sentiment_consumer.py
 
  /opt/spark/bin/spark-submit  --jars /home/sravani/libs/postgresql-42.2.5.jar   --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0   spark_streaming/sentiment_aggregator.py
+
+/opt/spark/bin/spark-submit   --jars /home/sravani/libs/postgresql-42.2.5.jar   --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0   spark_streaming/hot_topic_aggregator.py

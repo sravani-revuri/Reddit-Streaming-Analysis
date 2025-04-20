@@ -126,3 +126,5 @@ TRUNCATE TABLE public.sentiment_aggregated RESTART IDENTITY CASCADE;
 TRUNCATE TABLE public.sentiment_aggregated_batch RESTART IDENTITY CASCADE;
 TRUNCATE TABLE public.sentiment_results RESTART IDENTITY CASCADE;
 TRUNCATE TABLE public.trending_words_batch RESTART IDENTITY CASCADE;
+
+
