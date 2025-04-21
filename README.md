@@ -1,1 +1,3 @@
 # DBT-PROJECT
+
+The project addresses the challenge of efficiently processing and analyzing large volumes of real-time social media data, specifically Reddit posts. It aims to extract meaningful insights such as keyword filter and sentiment analysis from continuously incoming Reddit data streams. By leveraging tools like Apache Kafka, Apache Spark, and PostgreSQL, the project compares real-time and batch processing methods to evaluate performance and applicability. The end goal is to enable data-driven decisions and visual insights through Power BI, demonstrating the value of an integrated big data pipeline.
