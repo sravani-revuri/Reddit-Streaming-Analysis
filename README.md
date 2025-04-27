@@ -8,7 +8,7 @@ It ingests Reddit posts, filters them by keywords, analyzes their sentiment, agg
 
 ## 🛠 Architecture Overview
 
-![Architecture Diagram](link_to_your_architecture_diagram_here)
+![Architecture Diagram](Sentiment Analyse.png)
 
 <!-- 👉 Replace the above link with your uploaded image link in GitHub -->
 
