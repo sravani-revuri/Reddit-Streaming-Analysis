@@ -5,9 +5,9 @@ import time
 
 # Setup Reddit API
 reddit = praw.Reddit(
-    client_id='WNlvBYoiez6dSy1U7L2RJA',
-    client_secret='npfshKDZIhPYnvkGZ3xgECxCTog60Q',
-    user_agent='python:reddit_streamer:v1.0 (by /u/sravz_24)'
+    client_id='YOUR_CLIENT_ID',
+    client_secret='YOUR_CLIENT_KEY',
+    user_agent='AGENT'
 )
 
 # Setup Kafka Producer
